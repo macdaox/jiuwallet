@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gas配置调试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .config-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .fix-button {
+            background: #28a745;
+        }
+        .fix-button:hover {
+            background: #1e7e34;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Gas配置调试工具</h1>
+        <p>检查您的Gas配置是否正确设置</p>
+
+        <button onclick="checkConfig()">检查当前配置</button>
+        <button onclick="fixConfig()" class="fix-button">修复配置</button>
+        <button onclick="clearConfig()">清除配置</button>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function checkConfig() {
+            const resultsDiv = document.getElementById('results');
+            const config = JSON.parse(localStorage.getItem('walletConfig') || '{}');
+            
+            let html = '<h2>📊 当前配置状态</h2>';
+            
+            // 检查Gas策略
+            const gasStrategy = config.gasStrategy || '未设置';
+            const gasMultiplier = config.gasMultiplier || 1;
+            const rescueMode = config.rescueMode || false;
+            const rescueGasMultiplier = config.rescueGasMultiplier || 3;
+            const autoTransfer = config.autoTransfer || false;
+            
+            html += `
+                <div class="config-item ${gasStrategy === 'custom' ? 'success' : 'warning'}">
+                    <strong>Gas策略:</strong> ${gasStrategy}
+                    ${gasStrategy !== 'custom' ? '<br><small>⚠️ 需要设置为"custom"才能使用自定义倍数</small>' : ''}
+                </div>
+                
+                <div class="config-item ${gasMultiplier >= 2.5 ? 'success' : 'warning'}">
+                    <strong>Gas倍数:</strong> ${gasMultiplier}x
+                    ${gasMultiplier < 2.5 ? '<br><small>⚠️ 当前倍数低于2.5x</small>' : ''}
+                </div>
+                
+                <div class="config-item ${rescueMode ? 'warning' : 'success'}">
+                    <strong>抢救模式:</strong> ${rescueMode ? '启用' : '禁用'}
+                    ${rescueMode ? '<br><small>⚠️ 抢救模式会使用rescueGasMultiplier而不是gasMultiplier</small>' : ''}
+                </div>
+                
+                <div class="config-item">
+                    <strong>抢救模式Gas倍数:</strong> ${rescueGasMultiplier}x
+                </div>
+                
+                <div class="config-item ${autoTransfer ? 'success' : 'warning'}">
+                    <strong>自动转账:</strong> ${autoTransfer ? '启用' : '禁用'}
+                </div>
+            `;
+            
+            // 分析问题
+            html += '<h3>🔍 问题分析</h3>';
+            
+            if (gasStrategy !== 'custom') {
+                html += `
+                    <div class="config-item error">
+                        <strong>问题1:</strong> Gas策略不是"custom"
+                        <br><small>当前策略"${gasStrategy}"不会使用您设置的自定义倍数</small>
+                    </div>
+                `;
+            }
+            
+            if (rescueMode) {
+                html += `
+                    <div class="config-item warning">
+                        <strong>问题2:</strong> 启用了抢救模式
+                        <br><small>抢救模式会使用rescueGasMultiplier(${rescueGasMultiplier}x)而不是gasMultiplier(${gasMultiplier}x)</small>
+                    </div>
+                `;
+            }
+            
+            if (!autoTransfer) {
+                html += `
+                    <div class="config-item warning">
+                        <strong>问题3:</strong> 自动转账未启用
+                        <br><small>需要启用自动转账才能触发自动转账功能</small>
+                    </div>
+                `;
+            }
+            
+            // 显示实际使用的配置
+            html += '<h3>🎯 实际使用的配置</h3>';
+            const actualStrategy = rescueMode ? 'custom' : gasStrategy;
+            const actualMultiplier = rescueMode ? rescueGasMultiplier : (gasStrategy === 'custom' ? gasMultiplier : 1);
+            
+            html += `
+                <div class="config-item">
+                    <strong>实际Gas策略:</strong> ${actualStrategy}
+                </div>
+                <div class="config-item">
+                    <strong>实际Gas倍数:</strong> ${actualMultiplier}x
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function fixConfig() {
+            const config = JSON.parse(localStorage.getItem('walletConfig') || '{}');
+            
+            // 修复配置
+            config.gasStrategy = 'custom';
+            config.gasMultiplier = 2.5;
+            config.rescueMode = false; // 关闭抢救模式
+            config.autoTransfer = true; // 启用自动转账
+            
+            localStorage.setItem('walletConfig', JSON.stringify(config));
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="config-item success">
+                    <h3>✅ 配置已修复</h3>
+                    <p>已设置以下配置:</p>
+                    <ul>
+                        <li>Gas策略: custom</li>
+                        <li>Gas倍数: 2.5x</li>
+                        <li>抢救模式: 禁用</li>
+                        <li>自动转账: 启用</li>
+                    </ul>
+                    <p><strong>现在请重新启动监控，Gas价格应该会按2.5倍执行。</strong></p>
+                </div>
+            `;
+        }
+        
+        function clearConfig() {
+            localStorage.removeItem('walletConfig');
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="config-item">
+                    <h3>🗑️ 配置已清除</h3>
+                    <p>所有配置已重置，请重新配置。</p>
+                </div>
+            `;
+        }
+        
+        // 页面加载时自动检查
+        window.addEventListener('load', checkConfig);
+    </script>
+</body>
+</html> 
